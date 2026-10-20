@@ -1,0 +1,11 @@
+stereo=1
+world_scale=1.0
+fov_override=1
+body_follow=1
+head_mouse=1
+sens_x=12.0
+sens_y=12.0
+invert_y=0
+head_locked=1
+distance=2.5
+width=3.2

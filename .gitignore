@@ -1,0 +1,38 @@
+# Build output
+vrmod/build/
+build/
+*.obj
+*.pdb
+*.ilk
+*.exp
+*.lib
+*.dll
+*.exe
+
+# Python
+__pycache__/
+*.pyc
+
+# Local runtime state (logs, command files, captured data) — never commit
+*.log
+*.flag
+replay/
+data/
+*.bin
+*.raw
+mod_originals.json
+mod_settings.json
+
+# TLS material / anything secret — never commit
+*.pfx
+*.pem
+*.key
+*.crt
+arrowhead-login.json
+
+# Editor / OS
+.vs/
+.vscode/
+*.user
+Thumbs.db
+desktop.ini

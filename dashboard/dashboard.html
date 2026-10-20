@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HD2 Mod Control</title>
+<style>
+  :root{
+    --bg:#0a0e12; --panel:#121820; --panel2:#0e141b; --line:#1e2a36;
+    --txt:#dfe8f0; --dim:#7f93a6; --accent:#ffd24a; --ok:#4ad07a;
+    --warn:#f0a73a; --err:#ff5a5a; --blue:#4aa8ff; --purple:#b48cff;
+    --mono:"Cascadia Code",ui-monospace,"SF Mono",Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.4 var(--mono);
+       background-image:radial-gradient(circle at 20% -10%,#15202b 0,transparent 55%);}
+  header{display:flex;align-items:center;gap:18px;padding:14px 20px;border-bottom:1px solid var(--line);
+         position:sticky;top:0;background:rgba(10,14,18,.92);backdrop-filter:blur(6px);z-index:5;flex-wrap:wrap}
+  h1{font-size:15px;margin:0;letter-spacing:2px;color:var(--accent);text-transform:uppercase}
+  h1 small{color:var(--dim);letter-spacing:0;text-transform:none;font-size:11px;margin-left:8px}
+  .tabs{display:flex;gap:6px}
+  .tab{background:none;border:1px solid var(--line);color:var(--dim);font:inherit;font-size:12px;padding:5px 12px;border-radius:6px;cursor:pointer}
+  .tab.on{color:var(--accent);border-color:var(--accent)}
+  .status{display:flex;gap:16px;margin-left:auto;align-items:center;font-size:12px;flex-wrap:wrap}
+  .pill{display:flex;align-items:center;gap:7px;padding:5px 11px;border:1px solid var(--line);border-radius:20px;background:var(--panel)}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--err);box-shadow:0 0 8px var(--err)}
+  .dot.on{background:var(--ok);box-shadow:0 0 10px var(--ok)}
+  .dot.mid{background:var(--warn);box-shadow:0 0 10px var(--warn)}
+  .dot.pulse{animation:pulse 1.4s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  main{padding:18px 20px;max-width:1500px;margin:0 auto}
+  [hidden]{display:none !important}
+
+  /* ---- mods ---- */
+  .enginebar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);
+             border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:12px}
+  .enginebar .job{flex:1 1 260px;min-width:200px}
+  .bar{height:6px;background:#1a2430;border-radius:3px;overflow:hidden;margin-top:4px}
+  .bar i{display:block;height:100%;background:var(--accent);width:0;transition:width .4s}
+  .btn{background:#172230;border:1px solid var(--line);color:var(--txt);font:inherit;font-size:12px;padding:5px 11px;border-radius:6px;cursor:pointer}
+  .btn:hover{border-color:var(--accent);color:var(--accent)}
+  .btn.stop{border-color:#5a2a2a;color:#ff9a9a}
+  .btn.stop:hover{border-color:var(--err);color:var(--err)}
+  .group{margin-bottom:20px}
+  .group h2{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin:0 0 10px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}
+  .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);
+        border-radius:10px;padding:14px 15px;position:relative;overflow:hidden}
+  .card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--c,#2a3644)}
+  .card.is-on{--c:var(--ok)} .card.is-err{--c:var(--err)} .card.is-work{--c:var(--warn)}
+  .card h3{margin:0;font-size:14px;letter-spacing:.5px;display:flex;align-items:center;gap:10px}
+  .card .desc{color:var(--dim);font-size:11px;margin:6px 0 10px}
+  .field{display:flex;flex-direction:column;gap:3px;margin-bottom:8px;font-size:11px;color:var(--dim)}
+  .field input,.field select,.field textarea{background:#0b1117;border:1px solid var(--line);color:var(--txt);font:inherit;font-size:12px;
+        padding:6px 8px;border-radius:6px;width:100%}
+  .field textarea{min-height:58px;resize:vertical}
+  .field.check{flex-direction:row;align-items:center;gap:8px;color:var(--txt)}
+  .field.check input{width:auto}
+  .field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--accent)}
+  .foot{display:flex;align-items:center;gap:10px;font-size:11px}
+  .state{color:var(--dim);flex:1 1 auto;overflow-wrap:anywhere}
+  .state.on{color:var(--ok)} .state.error{color:var(--err)} .state.working{color:var(--warn)}
+  .slow{font-size:10px;color:var(--purple);border:1px solid #3a2f55;border-radius:4px;padding:0 5px}
+  /* toggle switch */
+  .sw{position:relative;width:38px;height:20px;margin-left:auto;flex:0 0 auto}
+  .sw input{opacity:0;width:0;height:0}
+  .sw span{position:absolute;inset:0;background:#26313d;border-radius:20px;cursor:pointer;transition:.2s}
+  .sw span::before{content:"";position:absolute;width:14px;height:14px;left:3px;top:3px;background:#9fb0c0;border-radius:50%;transition:.2s}
+  .sw input:checked + span{background:#1f5136}
+  .sw input:checked + span::before{transform:translateX(18px);background:var(--ok)}
+  .logbox{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .logbox h3{margin:0;padding:10px 14px;font-size:12px;letter-spacing:1px;border-bottom:1px solid var(--line);text-transform:uppercase;color:var(--dim)}
+  .logbox .body{max-height:30vh;overflow:auto;padding:6px 14px;font-size:11px;color:var(--dim)}
+
+  /* ---- server (gateway monitor) ---- */
+  .sgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-bottom:20px}
+  .scard{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);
+        border-radius:10px;padding:14px 15px;position:relative;overflow:hidden}
+  .scard::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--c,#4aa8ff)}
+  .scard h2{margin:0 0 2px;font-size:14px;letter-spacing:1px;display:flex;align-items:center;gap:8px}
+  .scard .about{color:var(--dim);font-size:11px;min-height:30px;margin-bottom:10px}
+  .nums{display:flex;gap:14px;margin-bottom:10px;flex-wrap:wrap}
+  .num{display:flex;flex-direction:column}
+  .num b{font-size:22px;line-height:1}
+  .num span{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px}
+  .n-real b{color:var(--ok)} .n-empty b{color:var(--warn)} .n-err b{color:var(--err)} .n-req b{color:var(--txt)}
+  .chips{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px}
+  .chip{font-size:10px;padding:2px 7px;border-radius:10px;background:#172230;color:var(--blue);border:1px solid var(--line)}
+  .mini{border-top:1px dashed var(--line);padding-top:8px;max-height:150px;overflow:auto}
+  .row{display:flex;gap:8px;font-size:11px;padding:2px 0;align-items:baseline}
+  .row .t{color:var(--dim);flex:0 0 auto}
+  .row .m{flex:0 0 38px;color:var(--purple)}
+  .row .p{flex:1 1 auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--txt)}
+  .row.real .o{color:var(--ok)} .row.empty .o{color:var(--warn)}
+  .row.pending .o{color:var(--dim)}
+  .o{flex:0 0 auto;font-size:10px}
+  .panels{display:grid;grid-template-columns:1.5fr 1fr;gap:14px}
+  @media(max-width:900px){.panels{grid-template-columns:1fr}}
+  .box{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .box h3{margin:0;padding:10px 14px;font-size:12px;letter-spacing:1px;border-bottom:1px solid var(--line);
+          text-transform:uppercase;color:var(--dim);display:flex;align-items:center;gap:8px}
+  .box .body{max-height:52vh;overflow:auto}
+  .feedrow{display:flex;gap:10px;padding:5px 14px;font-size:12px;border-bottom:1px solid #141c25;align-items:baseline}
+  .feedrow .t{color:var(--dim);flex:0 0 auto}
+  .feedrow .badge{flex:0 0 78px;font-size:10px;text-align:center;border-radius:4px;padding:1px 0;color:#0a0e12;font-weight:700}
+  .b-Arrowhead{background:var(--accent)} .b-PlayFab{background:var(--blue)} .b-PubSub{background:var(--purple)}
+  .b-PSN{background:#ff8cc8} .b-Other{background:#5c6b7a}
+  .feedrow .m{flex:0 0 40px;color:var(--purple)}
+  .feedrow .p{flex:1 1 auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .feedrow .o{flex:0 0 auto;font-size:10px;color:var(--dim)}
+  .errrow{padding:7px 14px;font-size:11px;border-bottom:1px solid #241317;color:#ffb0b0}
+  .errrow .t{color:var(--err);margin-right:8px}
+  .empty-state{padding:24px 14px;color:var(--dim);text-align:center;font-size:12px}
+  ::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-thumb{background:#24303c;border-radius:4px}
+</style>
+</head>
+<body>
+<header>
+  <h1>HD2 Mod Control <small id="sub">offline build only</small></h1>
+  <nav class="tabs">
+    <button class="tab on" data-tab="mods">Mods</button>
+    <button class="tab" data-tab="server">Server</button>
+  </nav>
+  <div class="status">
+    <div class="pill"><span class="dot" id="d-game"></span> helldivers2</div>
+    <div class="pill"><span class="dot" id="d-tables"></span> tables</div>
+    <div class="pill" style="border-color:#24303c"><span id="clock">--:--:--</span></div>
+  </div>
+</header>
+
+<main id="tab-mods">
+  <div class="enginebar">
+    <div><b id="eng-state">connecting...</b> <span id="eng-pid" style="color:var(--dim)"></span></div>
+    <div class="job"><span id="job-name" style="color:var(--dim)">idle</span><div class="bar"><i id="job-bar"></i></div></div>
+    <button class="btn stop" id="btn-stop" title="Stop the running action and clear the queue" hidden>Stop</button>
+    <button class="btn" id="btn-reapply" title="Re-apply every enabled mod, e.g. after the game rebuilt its text">Re-apply all</button>
+    <button class="btn" id="btn-rescan" title="Find the game's tables again">Rescan tables</button>
+  </div>
+  <div id="groups"></div>
+  <div class="logbox"><h3>Engine log</h3><div class="body" id="eng-log"></div></div>
+</main>
+
+<main id="tab-server" hidden>
+  <div class="sgrid" id="cards"></div>
+  <div class="panels">
+    <div class="box"><h3>Live traffic <span class="dot on pulse" style="width:7px;height:7px"></span></h3><div class="body" id="feed"></div></div>
+    <div class="box"><h3 style="color:var(--err)">Errors &amp; warnings</h3><div class="body" id="errors"></div></div>
+  </div>
+</main>
+
+<script>
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const $=id=>document.getElementById(id);
+let activeTab="mods", modsBuilt="", lastSnap=null;
+
+// ---------------- tabs ----------------
+document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{
+  activeTab=b.dataset.tab;
+  document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("on",x===b));
+  $("tab-mods").hidden=activeTab!=="mods";
+  $("tab-server").hidden=activeTab!=="server";
+  if(activeTab==="server") serverTick();
+});
+
+// ---------------- mods ----------------
+async function post(url,body){
+  const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{})});
+  const j=await r.json(); if(j.mods) render(j); return j;
+}
+
+function fieldHtml(mod,p){
+  const v=mod.values[p.key];
+  const id=`f-${mod.id}-${p.key}`;
+  const show=p.showIf?` data-showif="${esc(p.showIf[0])}" data-showval="${esc(p.showIf[1])}"`:"";
+  let input;
+  if(p.type==="bool"){
+    return `<label class="field check"${show}><input id="${id}" type="checkbox" data-key="${esc(p.key)}"${v?" checked":""}> ${esc(p.label)}</label>`;
+  }else if(p.type==="select"){
+    input=`<select id="${id}" data-key="${esc(p.key)}">`+p.options.map(o=>
+      `<option value="${esc(o.value)}"${String(o.value)===String(v)?" selected":""}>${esc(o.label)}</option>`).join("")+`</select>`;
+  }else if(p.type==="textarea"){
+    input=`<textarea id="${id}" data-key="${esc(p.key)}"${p.max?` maxlength="${p.max}"`:""}>${esc(v)}</textarea>`;
+  }else{
+    const t=(p.type==="int"||p.type==="float")?"number":"text";
+    const step=p.type==="float"?' step="any"':"";
+    input=`<input id="${id}" type="${t}"${step} data-key="${esc(p.key)}" value="${esc(v)}"${p.max?` maxlength="${p.max}"`:""}>`;
+  }
+  return `<label class="field"${show}>${esc(p.label)}${input}</label>`;
+}
+
+function cardHtml(m){
+  return `<div class="card" id="card-${m.id}">
+    <h3>${esc(m.name)} ${m.slow?'<span class="slow" title="needs a memory scan (about a minute)">scan</span>':""}
+      <label class="sw"><input type="checkbox" data-toggle="${m.id}"${m.enabled?" checked":""}><span></span></label></h3>
+    <div class="desc">${esc(m.desc)}</div>
+    ${m.params.map(p=>fieldHtml(m,p)).join("")}
+    <div class="foot"><span class="state" id="state-${m.id}"></span>
+      <button class="btn stop" data-stop="${m.id}" title="Stop this mod; anything it changed is undone" hidden>Stop</button>
+      ${m.params.length?`<button class="btn" data-apply="${m.id}">Apply</button>`:""}</div>
+  </div>`;
+}
+
+function readValues(modId){
+  const vals={};
+  document.querySelectorAll(`#card-${modId} [data-key]`).forEach(el=>{
+    const p=lastSnap.mods.find(m=>m.id===modId).params.find(x=>x.key===el.dataset.key);
+    let v=el.value;
+    if(p.type==="bool") v=el.checked;
+    else if(p.type==="int") v=parseInt(v,10);
+    else if(p.type==="float") v=parseFloat(v);
+    else if(p.type==="select"){ const o=p.options.find(o=>String(o.value)===v); v=o?o.value:v; }
+    vals[el.dataset.key]=v;
+  });
+  return vals;
+}
+
+function updateShowIf(card){
+  card.querySelectorAll("[data-showif]").forEach(f=>{
+    const ctl=card.querySelector(`[data-key="${f.dataset.showif}"]`);
+    f.hidden=!ctl||ctl.value!==f.dataset.showval;
+  });
+}
+
+function build(s){
+  const groups={};
+  s.mods.forEach(m=>(groups[m.group]=groups[m.group]||[]).push(m));
+  $("groups").innerHTML=Object.entries(groups).map(([g,ms])=>
+    `<div class="group"><h2>${esc(g)}</h2><div class="grid">${ms.map(cardHtml).join("")}</div></div>`).join("");
+  document.querySelectorAll("[data-toggle]").forEach(cb=>cb.onchange=()=>
+    post(`/api/mods/${cb.dataset.toggle}`,{enabled:cb.checked,values:readValues(cb.dataset.toggle)}));
+  document.querySelectorAll("[data-apply]").forEach(b=>b.onclick=()=>
+    post(`/api/mods/${b.dataset.apply}`,{values:readValues(b.dataset.apply)}));
+  document.querySelectorAll("[data-stop]").forEach(b=>b.onclick=()=>post(`/api/engine/stop/${b.dataset.stop}`));
+  document.querySelectorAll(".card").forEach(card=>{
+    updateShowIf(card);
+    card.querySelectorAll("select").forEach(sel=>sel.addEventListener("change",()=>updateShowIf(card)));
+  });
+}
+
+function render(s){
+  lastSnap=s;
+  const sig=s.mods.map(m=>m.id).join(",");
+  if(sig!==modsBuilt){ build(s); modsBuilt=sig; }
+  const e=s.engine;
+  $("d-game").className="dot"+(e.gameUp?" on pulse":"");
+  $("d-tables").className="dot"+(e.tablesReady?" on":(e.gameUp?" mid":""));
+  $("eng-state").textContent=!e.gameUp?"Game not running":(e.tablesReady?"Attached, tables found":"Attached, finding tables...");
+  $("eng-pid").textContent=e.pid?`pid ${e.pid}${e.tablesReady?` | ${e.attackRows} attack rows`:""}`:"";
+  $("job-name").textContent=e.job.name?`${e.job.name} ${Math.round(e.job.progress*100)}%`:(e.queued?`${e.queued} queued`:"idle");
+  $("job-bar").style.width=(e.job.name?Math.round(e.job.progress*100):0)+"%";
+  $("btn-stop").hidden=!(e.current||e.queued);
+  $("eng-log").innerHTML=e.log.map(l=>`<div>${esc(l)}</div>`).join("")||'<div class="empty-state">nothing yet</div>';
+  s.mods.forEach(m=>{
+    const card=$("card-"+m.id), st=$("state-"+m.id), cb=card.querySelector("[data-toggle]");
+    if(cb.checked!==m.enabled && document.activeElement!==cb) cb.checked=m.enabled;
+    const state=m.status.state;
+    st.className="state "+state;
+    st.textContent=({on:"ON",off:"off",error:"ERROR",working:"working",pending:"waiting for game"}[state]||state)+(m.status.message?" - "+m.status.message:"");
+    card.classList.toggle("is-on",state==="on");
+    card.classList.toggle("is-err",state==="error");
+    card.classList.toggle("is-work",state==="working");
+    card.querySelector("[data-stop]").hidden=state!=="working";
+  });
+}
+
+async function modsTick(){
+  try{ render(await (await fetch("/api/mods",{cache:"no-store"})).json()); $("sub").textContent="offline build only"; }
+  catch(e){ $("sub").textContent="backend unreachable - is server.py running?"; }
+  $("clock").textContent=new Date().toLocaleTimeString();
+}
+$("btn-reapply").onclick=()=>post("/api/engine/reapply");
+$("btn-stop").onclick=()=>post("/api/engine/stop");
+$("btn-rescan").onclick=()=>post("/api/engine/rescan");
+
+// ---------------- server (original gateway monitor) ----------------
+const ORDER=["Arrowhead","PlayFab","PubSub","PSN","Other"];
+const COLOR={Arrowhead:"#ffd24a",PlayFab:"#4aa8ff",PubSub:"#b48cff",PSN:"#ff8cc8",Other:"#5c6b7a"};
+function scard(name,c){
+  const subs=Object.entries(c.subs||{}).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<span class="chip">${esc(k)} ${v}</span>`).join("");
+  const mini=(c.recent||[]).slice().reverse().map(r=>
+    `<div class="row ${r.cls}"><span class="t">${r.t}</span><span class="m">${esc(r.method)}</span>`+
+    `<span class="p">${esc(r.path)}</span><span class="o">${esc(r.outcome||"")}</span></div>`).join("")
+    || `<div class="empty-state">no traffic yet</div>`;
+  return `<div class="scard" style="--c:${COLOR[name]}">
+    <h2>${name} ${c.last?`<span style="margin-left:auto;font-size:10px;color:var(--dim)">last ${c.last}</span>`:""}</h2>
+    <div class="about">${esc(c.about)}</div>
+    <div class="nums">
+      <div class="num n-req"><b>${c.requests}</b><span>requests</span></div>
+      <div class="num n-real"><b>${c.real}</b><span>real data</span></div>
+      <div class="num n-empty"><b>${c.empty}</b><span>empty</span></div>
+      <div class="num n-err"><b>${c.errors}</b><span>errors</span></div>
+    </div>
+    <div class="chips">${subs}</div>
+    <div class="mini">${mini}</div>
+  </div>`;
+}
+async function serverTick(){
+  if(activeTab!=="server") return;
+  let s;
+  try{ s=await (await fetch("/api/status",{cache:"no-store"})).json(); }catch(e){ return; }
+  $("cards").innerHTML=ORDER.map(n=>scard(n,s.components[n])).join("");
+  $("feed").innerHTML=(s.feed||[]).map(f=>
+    `<div class="feedrow"><span class="t">${f.t}</span><span class="badge b-${f.comp}">${f.comp}</span>`+
+    `<span class="m">${esc(f.method)}</span><span class="p">${esc(f.path)}</span>`+
+    `<span class="o ${f.cls}">${esc(f.outcome||"")}</span></div>`).join("")
+    || `<div class="empty-state">waiting for the game to talk to the stack...</div>`;
+  $("errors").innerHTML=(s.errors||[]).map(e=>
+    `<div class="errrow"><span class="t">${e.t}</span>[${esc(e.comp)}] ${esc(e.text)}</div>`).join("")
+    || `<div class="empty-state" style="color:var(--ok)">no errors - all clear</div>`;
+}
+
+modsTick(); setInterval(modsTick,1500); setInterval(serverTick,2000);
+</script>
+</body>
+</html>
